@@ -20,18 +20,31 @@ export const start = async () => {
 
     const Posts = db.collection('posts')
     const Comments = db.collection('comments')
+    const Users = db.collection('users')
 
     const typeDefs = [`
       type Query {
         post(_id: String): Post
+        user(_id: String): User
+        userone(login: String, password: String): User
         posts: [Post]
+        users: [User]
         comment(_id: String): Comment
+      }
+
+      type User {
+        _id: String
+        name: String
+        login: String
+        password: String
+        posts: [Post]
       }
 
       type Post {
         _id: String
         title: String
         content: String
+        user: User
         comments: [Comment]
       }
 
@@ -43,8 +56,9 @@ export const start = async () => {
       }
 
       type Mutation {
-        createPost(title: String, content: String): Post
+        createPost(title: String, content: String, userId: String): Post
         createComment(postId: String, content: String): Comment
+        createUser(login: String, password: String, name: String): User
       }
 
       schema {
@@ -61,13 +75,30 @@ export const start = async () => {
         posts: async () => {
           return (await Posts.find({}).toArray()).map(prepare)
         },
+        user: async (root, {_id}) => {
+          return prepare(await Users.findOne(ObjectId(_id)))
+        },
+        userone: async (root, {login, password}) => {
+          return prepare(await Users.findOne({login, password}))
+        },
+        users: async () => {
+          return (await Users.find({}).toArray()).map(prepare)
+        },
         comment: async (root, {_id}) => {
           return prepare(await Comments.findOne(ObjectId(_id)))
         },
       },
+      User: {
+        posts: async ({_id}) => {
+          return (await Posts.find({userId: _id}).toArray()).map(prepare)
+        }
+      },
       Post: {
         comments: async ({_id}) => {
           return (await Comments.find({postId: _id}).toArray()).map(prepare)
+        },
+        user: async ({_id}) => {
+          return (await Comments.find({userId: _id}).toArray()).map(prepare)
         }
       },
       Comment: {
@@ -84,6 +115,10 @@ export const start = async () => {
           const res = await Comments.insert(args)
           return prepare(await Comments.findOne({_id: res.insertedIds[1]}))
         },
+        createUser: async (root, args, context, info) => {
+          const res = await Users.insert(args)
+          return prepare(await Users.findOne({_id:res.insertedIds[1]}))
+        }
       },
     }
 
