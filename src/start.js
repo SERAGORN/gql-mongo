@@ -1,11 +1,12 @@
 import {MongoClient, ObjectId} from 'mongodb'
 import express from 'express'
+import socketio from 'socket.io'
 import bodyParser from 'body-parser'
 import {graphqlExpress, graphiqlExpress} from 'graphql-server-express'
 import {makeExecutableSchema} from 'graphql-tools'
 import cors from 'cors'
 
-const URL = 'http://192.168.1.37'
+const URL = 'http://192.168.1.38'
 const PORT = 3001
 const MONGO_URL = 'mongodb://localhost:27017/blog'
 
@@ -142,6 +143,25 @@ export const start = async () => {
     app.listen(PORT, () => {
       console.log(`Visit ${URL}:${PORT}${homePath}`)
     })
+    //SecondPort
+    var web = express();
+    //var socketio = socketio();
+    var http = require('http')
+    var serverio = http.Server(web)
+    var websocket = socketio(serverio)
+    web.get('/', function (req, res) {
+      res.send('Hello World!');
+    });
+
+    serverio.listen(3010, function () {
+      console.log('Example app listening on port 3010!');
+    });
+    websocket.on('connection', (socket)=> {
+      console.log('A client just joined on', socket.id);
+    })
+
+
+
 
   } catch (e) {
     console.log(e)
