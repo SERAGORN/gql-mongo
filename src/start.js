@@ -6,7 +6,7 @@ import {graphqlExpress, graphiqlExpress} from 'graphql-server-express'
 import {makeExecutableSchema} from 'graphql-tools'
 import cors from 'cors'
 
-const URL = 'http://192.168.1.38'
+const URL = 'http://192.168.1.35'
 const PORT = 3001
 const MONGO_URL = 'mongodb://localhost:27017/blog'
 
@@ -138,7 +138,7 @@ export const start = async () => {
 
     app.use(homePath, graphiqlExpress({
       endpointURL: '/graphql'
-    }))
+    })) 
 
     app.listen(PORT, () => {
       console.log(`Visit ${URL}:${PORT}${homePath}`)
@@ -157,10 +157,17 @@ export const start = async () => {
       console.log('Example app listening on port 3010!');
     });
     websocket.on('connection', (socket)=> {
+      socket.emit('message','data_test')
+      socket.on('sended',(data)=> 
+    console.log(data))
       console.log('A client just joined on', socket.id);
     })
 
-
+    websocket.on('i-need-id', () => {
+      // Create a document in the db and grab that id.
+      //var user = db.collection('users').insert({});
+      socket.emit('here-is-your-id', user._id);
+    });
 
 
   } catch (e) {
