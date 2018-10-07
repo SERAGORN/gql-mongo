@@ -6,7 +6,7 @@ import {graphqlExpress, graphiqlExpress} from 'graphql-server-express'
 import {makeExecutableSchema} from 'graphql-tools'
 import cors from 'cors'
 
-const URL = 'http://192.168.1.35'
+const URL = 'http://192.168.1.38'
 const PORT = 3001
 const MONGO_URL = 'mongodb://localhost:27017/blog'
 
