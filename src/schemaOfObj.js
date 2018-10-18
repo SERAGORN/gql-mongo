@@ -6,7 +6,7 @@ import { graphqlExpress, graphiqlExpress } from 'graphql-server-express'
 import { makeExecutableSchema } from 'graphql-tools'
 import cors from 'cors'
 
-const URL = 'http://192.168.1.38'
+const URL = 'http://localhost'
 const PORT = 3001
 const MONGO_URL = 'mongodb://localhost:27017/subj_control'
 
@@ -29,6 +29,7 @@ export const goOnSpl = async () => {
             subjectofteach(teacher: String): Subject
             tasks: [Task]
             subjects(teacher: String): [Subject]
+            subjects(day: String): [Subject]
         }
 
         type Subject {
@@ -40,17 +41,18 @@ export const goOnSpl = async () => {
             tasks: [Task]
         }
 
+
         type Task {
             _id: String
             title: String
             content: String
-            subject: Subject
+            subjectId: Subject
         }
 
         type Mutation {
             createTask(title: String, content: String, subjectId: String): Task
             createSubject(title: String, teacher: String, date: String): Subject
-            updateSubject(_id: String): Subject
+            updateSubject(_id: String, days: String): Subject
         }
 
         schema {
@@ -73,10 +75,14 @@ export const goOnSpl = async () => {
                 // userone: async (root, { login, password }) => {
                 //     return prepare(await Users.findOne({ login, password }))
                 // },
-                subjects: async (root, {teacher}) => {
-                    console.log(teacher)
-                    if (teacher) {
+                subjects: async (root, {teacher, day}) => {
+
+                    if (teacher != undefined) {
+                        console.log(teacher)
                         return (await Subjects.find({teacher: teacher}).toArray()).map(prepare)
+                    } else if (day != undefined) {
+                        console.log(day)
+                        return (await Subjects.find({day:   {'$regex': day}}).toArray()).map(prepare)
                     } else {
                         return (await Subjects.find({}).toArray()).map(prepare)
                     }
@@ -110,8 +116,17 @@ export const goOnSpl = async () => {
                 },
                 updateSubject: async (root, args, context, info) => {
                     console.log(args._id)
-                    const res = Subjects.findOneAndUpdate(ObjectId(args._id), {$set: {day: "lol"}})
-                    return prepare(await Subjects.findOne(ObjectId(args._id)))
+                    console.log(args.days)
+                    try {
+                        const res = await Subjects.findOneAndUpdate({ _id: ObjectId(args._id)}, {$set: {day: args.days}})
+                    } catch (e) {
+                        console.log("to Insert")
+                    }
+                    try {
+                        return prepare(await Subjects.findOne({ _id: ObjectId(args._id)}))
+                    } catch (e) {
+                        console.log("to Select")
+                    }
                 }
             },
         }
@@ -164,7 +179,7 @@ export const goOnSpl = async () => {
 
 
     } catch (e) {
-        console.log(e)
+        console.log("OSHIBKA")
     }
 
 }
