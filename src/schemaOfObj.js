@@ -17,6 +17,7 @@ const prepare = (o) => {
 
 export const goOnSpl = async () => {
     try {
+        
         const db = await MongoClient.connect(MONGO_URL)
 
         const Subjects = db.collection('subjects')
