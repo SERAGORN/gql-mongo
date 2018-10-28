@@ -6,7 +6,7 @@ import { graphqlExpress, graphiqlExpress } from 'graphql-server-express'
 import { makeExecutableSchema } from 'graphql-tools'
 import cors from 'cors'
 
-const URL = 'http://localhost'
+const URL = 'http://192.168.100.5'
 const PORT = 3001
 const MONGO_URL = 'mongodb://localhost:27017/subj_control'
 
@@ -17,11 +17,12 @@ const prepare = (o) => {
 
 export const goOnSpl = async () => {
     try {
-        const as = "asd"
         const db = await MongoClient.connect(MONGO_URL)
 
         const Subjects = db.collection('subjects')
         const Tasks = db.collection('tasks')
+        const Users = db.collection('users')
+        const Groups = db.collection('groups')
 
         const typeDefs = [`
         type Query {
@@ -31,6 +32,9 @@ export const goOnSpl = async () => {
             tasks: [Task]
             subjects(teacher: String): [Subject]
             subjects(day: String): [Subject]
+            users: [User]
+            user(_id: String, login: String, password: String): User
+            groups: [Group]
         }
 
         type Subject {
@@ -39,7 +43,26 @@ export const goOnSpl = async () => {
             teacher: String
             day: String
             date: String
+            groupId: String
             tasks: [Task]
+        }
+
+        type Group {
+            _id: String
+            title: String
+            content: String
+            subjects: [Subject]
+            users: [User]
+        }
+
+        type User {
+            _id: String
+            first_name: String
+            last_name: String
+            group_id: String
+            group_name: String
+            login: String
+            password: String
         }
 
 
@@ -47,12 +70,15 @@ export const goOnSpl = async () => {
             _id: String
             title: String
             content: String
-            subjectId: Subject
+            subjectId: String
+            subjects: Subject
         }
 
         type Mutation {
+            createGroup(title: String, content: String) : Group
+            createUser(first_name: String, last_name: String, login: String, password: String): User
             createTask(title: String, content: String, subjectId: String): Task
-            createSubject(title: String, teacher: String, date: String): Subject
+            createSubject(title: String, teacher: String, date: String, group_id: String): Subject
             updateSubject(_id: String, days: String): Subject
         }
 
@@ -79,10 +105,8 @@ export const goOnSpl = async () => {
                 subjects: async (root, {teacher, day}) => {
 
                     if (teacher != undefined) {
-                        console.log(teacher)
                         return (await Subjects.find({teacher: teacher}).toArray()).map(prepare)
                     } else if (day != undefined) {
-                        console.log(day)
                         return (await Subjects.find({day:   {'$regex': day}}).toArray()).map(prepare)
                     } else {
                         return (await Subjects.find({}).toArray()).map(prepare)
@@ -90,25 +114,44 @@ export const goOnSpl = async () => {
                 },
                 subjectofteach: async (root, {teacher}) => {
                     return prepare(await Subjects.findOne(ObjectId(teacher)).toArray()).map(prepare)
-                }
+                },
                 // subject: async (root, {teacher}) => {
                 //     return prepare(await Subjects.findOne(ObjectId(teacher)).toArray()).map(prepare)
                 // }
+                user: async (root, {_id, login, password}) => {
+                    if (_id != undefined) {
+                        return prepare(await Users.findOne(ObjectId(_id)))
+                    } else {
+                        return prepare(await Users.findOne({login, password}))
+                    }
+                },
+                users: async (root) => {
+                    return (await Users.find({}).toArray()).map(prepare)
+                }
             },
             Subject: {
                 tasks: async ({ _id }) => {
                     return (await Tasks.find({ subjectId: _id }).toArray()).map(prepare)
                 }
             },
-            // Task: {
-            //     subjects: async ({ _id }) => {
-            //         return (await Subject.find({ taskId: _id }).toArray()).map(prepare)
-            //     }
-            // },
+            Task: {
+                subjects: async ({ subjectId }) => {
+                    return prepare(await Subjects.findOne(ObjectId(subjectId)))
+                }
+            },
+            Group: {
+                subjects: async({_id}) => {
+                    return (await Subjects.find({groupId: _id}).toArray()).map(prepare)
+                }
+            },
             Mutation: {
+                createUser: async (root, args, context, info) => {
+                    const res = await Users.insert(args)
+                    return prepare(await Users.findOne({ _id: ObjectId(res.insertedIds[0])}))
+                },
                 createTask: async (root, args, context, info) => {
                     const res = await Tasks.insert(args)
-                    return prepare(await Tasks.findOne({ _id: res.insertedIds[1] }))
+                    return prepare(await Tasks.findOne({ _id: ObjectId(res.insertedIds[0])}))
                 },
                 createSubject: async (root, args, context, info) => {
                     const res = await Subjects.insert(args)
@@ -180,7 +223,7 @@ export const goOnSpl = async () => {
 
 
     } catch (e) {
-        console.log("OSHIBKA")
+        console.log(JSON.stringify(e))
     }
 
 }
