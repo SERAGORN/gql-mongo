@@ -6,7 +6,7 @@ import { graphqlExpress, graphiqlExpress } from 'graphql-server-express'
 import { makeExecutableSchema } from 'graphql-tools'
 import cors from 'cors'
 
-const URL = 'http://192.168.100.5'
+const URL = 'http://192.168.100.2'
 const PORT = 3001
 const MONGO_URL = 'mongodb://localhost:27017/subj_control'
 
@@ -43,7 +43,7 @@ export const goOnSpl = async () => {
             teacher: String
             day: String
             date: String
-            groupId: String
+            groupsId: String
             tasks: [Task]
         }
 
@@ -51,6 +51,7 @@ export const goOnSpl = async () => {
             _id: String
             title: String
             content: String
+            usersId: String
             subjects: [Subject]
             users: [User]
         }
@@ -59,8 +60,8 @@ export const goOnSpl = async () => {
             _id: String
             first_name: String
             last_name: String
-            group_id: String
-            group_name: String
+            groupId: String
+            groups: [Group]
             login: String
             password: String
         }
@@ -75,11 +76,13 @@ export const goOnSpl = async () => {
         }
 
         type Mutation {
-            createGroup(title: String, content: String) : Group
+            createGroup(title: String, content: String, userId: String) : Group
             createUser(first_name: String, last_name: String, login: String, password: String): User
             createTask(title: String, content: String, subjectId: String): Task
             createSubject(title: String, teacher: String, date: String, group_id: String): Subject
             updateSubject(_id: String, days: String): Subject
+            updateUser(_id: String, groupId: String) : User
+            updateGroup(_id: String, userId: String) : Group
         }
 
         schema {
@@ -127,6 +130,12 @@ export const goOnSpl = async () => {
                 },
                 users: async (root) => {
                     return (await Users.find({}).toArray()).map(prepare)
+                },
+                group: async (root, {_id}) => {
+                    return prepare(await Users.findOne(ObjectId(_id)))
+                },
+                groups: async (root) => {
+                    return (await Groups.find({}).toArray()).map(prepare)
                 }
             },
             Subject: {
@@ -142,12 +151,24 @@ export const goOnSpl = async () => {
             Group: {
                 subjects: async({_id}) => {
                     return (await Subjects.find({groupId: _id}).toArray()).map(prepare)
+                },
+                users: async({usersId}) => {
+                    return (await Users.find({_id: {$in: usersId}}).toArray()).map(prepare)
+                }
+            },
+            User: {
+                groups: async({_id}) => {
+                    return (await Groups.find({usersId: ObjectId(_id)}).toArray()).map(prepare)
+                    
                 }
             },
             Mutation: {
                 createUser: async (root, args, context, info) => {
                     const res = await Users.insert(args)
                     return prepare(await Users.findOne({ _id: ObjectId(res.insertedIds[0])}))
+                },
+                updateUser: async (root, args, context, info) => {
+                    const res = await Users.findOneAndUpdate({ _id: ObjectId(args._id)}, {$push: {groupId: ObjectId(args.groupId)}})
                 },
                 createTask: async (root, args, context, info) => {
                     const res = await Tasks.insert(args)
@@ -159,8 +180,6 @@ export const goOnSpl = async () => {
                     return prepare(await Subjects.findOne({ _id: res.insertedIds[1] }))
                 },
                 updateSubject: async (root, args, context, info) => {
-                    console.log(args._id)
-                    console.log(args.days)
                     try {
                         const res = await Subjects.findOneAndUpdate({ _id: ObjectId(args._id)}, {$set: {day: args.days}})
                     } catch (e) {
@@ -171,7 +190,16 @@ export const goOnSpl = async () => {
                     } catch (e) {
                         console.log("to Select")
                     }
+                },
+                createGroup: async (root, args, context, info) => {
+                    const res = await Groups.insert({title: args.title, content: args.content, usersId: [ObjectId(args.userId)]})
+                    return prepare(await Groups.findOne({ _id: ObjectId(res.insertedIds[0])}))
+                },
+                updateGroup: async (root, args, context, info) => {
+                    const res = await Groups.findOneAndUpdate({ _id: ObjectId(args._id)},{$push:{usersId: ObjectId(args.userId)}})
+                    return prepare(await Groups.findOne({ _id: ObjectId(args._id)}))
                 }
+                
             },
         }
 
@@ -218,6 +246,8 @@ export const goOnSpl = async () => {
         websocket.on('i-need-id', () => {
             // Create a document in the db and grab that id.
             //var user = db.collection('users').insert({});
+            //viewkey=ph5b5985230a448
+            //
             socket.emit('here-is-your-id', user._id);
         });
 
