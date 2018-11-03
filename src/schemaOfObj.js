@@ -152,7 +152,7 @@ export const goOnSpl = async () => {
             },
             Group: {
                 subjects: async({_id}) => {
-                    return (await Subjects.find({groupId: _id}).toArray()).map(prepare)
+                    return (await Subjects.find({groupsId: ObjectId(_id)}).toArray()).map(prepare)
                 },
                 users: async({usersId}) => {
                     return (await Users.find({_id: {$in: usersId}}).toArray()).map(prepare)
