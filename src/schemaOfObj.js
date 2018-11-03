@@ -35,6 +35,7 @@ export const goOnSpl = async () => {
             users: [User]
             user(_id: String, login: String, password: String): User
             groups: [Group]
+            group(_id: String): Group
         }
 
         type Subject {
@@ -45,6 +46,7 @@ export const goOnSpl = async () => {
             date: String
             groupsId: String
             tasks: [Task]
+            groups: [Group]
         }
 
         type Group {
@@ -79,7 +81,7 @@ export const goOnSpl = async () => {
             createGroup(title: String, content: String, userId: String) : Group
             createUser(first_name: String, last_name: String, login: String, password: String): User
             createTask(title: String, content: String, subjectId: String): Task
-            createSubject(title: String, teacher: String, date: String, group_id: String): Subject
+            createSubject(title: String, teacher: String, date: String, groupsId: String): Subject
             updateSubject(_id: String, days: String): Subject
             updateUser(_id: String, groupId: String) : User
             updateGroup(_id: String, userId: String) : Group
@@ -175,9 +177,8 @@ export const goOnSpl = async () => {
                     return prepare(await Tasks.findOne({ _id: ObjectId(res.insertedIds[0])}))
                 },
                 createSubject: async (root, args, context, info) => {
-                    const res = await Subjects.insert(args)
-                    console.log()
-                    return prepare(await Subjects.findOne({ _id: res.insertedIds[1] }))
+                    const res = await Subjects.insert({title: args.title, teacher: args.teacher, date: args.date, groupsId: ObjectId(args.groupsId) })
+                    return prepare(await Subjects.findOne({ _id: res.insertedIds[0] }))
                 },
                 updateSubject: async (root, args, context, info) => {
                     try {
@@ -253,7 +254,7 @@ export const goOnSpl = async () => {
 
 
     } catch (e) {
-        console.log(JSON.stringify(e))
+        console.log(e)
     }
 
 }
