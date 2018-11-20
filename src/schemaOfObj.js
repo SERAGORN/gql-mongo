@@ -6,7 +6,7 @@ import { graphqlExpress, graphiqlExpress } from 'graphql-server-express'
 import { makeExecutableSchema } from 'graphql-tools'
 import cors from 'cors'
 
-const URL = 'http://192.168.100.2'
+const URL = 'http://192.168.1.37'
 const PORT = 3001
 const MONGO_URL = 'mongodb://localhost:27017/subj_control'
 
@@ -134,7 +134,7 @@ export const goOnSpl = async () => {
                     return (await Users.find({}).toArray()).map(prepare)
                 },
                 group: async (root, {_id}) => {
-                    return prepare(await Users.findOne(ObjectId(_id)))
+                    return prepare(await Groups.findOne(ObjectId(_id)))
                 },
                 groups: async (root) => {
                     return (await Groups.find({}).toArray()).map(prepare)
