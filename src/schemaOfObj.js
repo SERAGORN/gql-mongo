@@ -54,7 +54,7 @@ export const goOnSpl = async () => {
             title: String
             content: String
             usersId: String
-            subjects: [Subject]
+            subjects(day: String = "123456"): [Subject]
             users: [User]
         }
 
@@ -81,10 +81,11 @@ export const goOnSpl = async () => {
             createGroup(title: String, content: String, userId: String) : Group
             createUser(first_name: String, last_name: String, login: String, password: String): User
             createTask(title: String, content: String, subjectId: String): Task
-            createSubject(title: String, teacher: String, date: String, groupsId: String): Subject
+            createSubject(title: String, teacher: String, date: String, groupId: String, time: String): Subject
             updateSubject(_id: String, days: String): Subject
             updateUser(_id: String, groupId: String) : User
             updateGroup(_id: String, userId: String) : Group
+            deleteGroup(_id: String): Group
         }
 
         schema {
@@ -151,8 +152,14 @@ export const goOnSpl = async () => {
                 }
             },
             Group: {
-                subjects: async({_id}) => {
-                    return (await Subjects.find({groupsId: ObjectId(_id)}).toArray()).map(prepare)
+                subjects: async ({_id}, {teacher, day}) => {
+                    if (teacher != undefined) {
+                        return (await Subjects.find({teacher: teacher, groupsId: ObjectId(_id)}).toArray()).map(prepare)
+                    } else if (day != undefined) {
+                        return (await Subjects.find({groupsId: ObjectId(_id),date: {$regex: day}}).toArray()).map(prepare)
+                    } else {
+                        return (await Subjects.find({groupsId: ObjectId(_id)}).toArray()).map(prepare)
+                    }
                 },
                 users: async({usersId}) => {
                     return (await Users.find({_id: {$in: usersId}}).toArray()).map(prepare)
@@ -177,7 +184,7 @@ export const goOnSpl = async () => {
                     return prepare(await Tasks.findOne({ _id: ObjectId(res.insertedIds[0])}))
                 },
                 createSubject: async (root, args, context, info) => {
-                    const res = await Subjects.insert({title: args.title, teacher: args.teacher, date: args.date, groupsId: ObjectId(args.groupsId) })
+                    const res = await Subjects.insert({title: args.title, teacher: args.teacher, date: args.date, groupsId: ObjectId(args.groupId), time: args.time })
                     return prepare(await Subjects.findOne({ _id: res.insertedIds[0] }))
                 },
                 updateSubject: async (root, args, context, info) => {
@@ -190,6 +197,13 @@ export const goOnSpl = async () => {
                         return prepare(await Subjects.findOne({ _id: ObjectId(args._id)}))
                     } catch (e) {
                         console.log("to Select")
+                    }
+                },
+                deleteGroup: async (root, args, context, info) => {
+                    try {
+                        await Groups.deleteOne({_id: ObjectId(args._id)})
+                    } catch (e) {
+                        console.log("WHAT???")
                     }
                 },
                 createGroup: async (root, args, context, info) => {
