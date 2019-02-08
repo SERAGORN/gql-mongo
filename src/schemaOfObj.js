@@ -6,7 +6,13 @@ import { graphqlExpress, graphiqlExpress } from 'graphql-server-express'
 import { makeExecutableSchema } from 'graphql-tools'
 import cors from 'cors'
 
-const URL = 'http://192.168.1.37'
+import { execute, subscribe } from 'graphql';
+import { createServer } from 'http';
+import { SubscriptionServer } from 'subscriptions-transport-ws';
+
+import { PubSub } from 'graphql-subscriptions'
+
+const URL = 'http://localhost'
 const PORT = 3001
 const MONGO_URL = 'mongodb://localhost:27017/subj_control'
 
@@ -14,6 +20,10 @@ const prepare = (o) => {
     o._id = o._id.toString()
     return o
 }
+
+const pubsub = new PubSub();
+
+const CHANNEL_ADDED_TOPIC = 'newChannel';
 
 export const goOnSpl = async () => {
     try {
@@ -38,6 +48,10 @@ export const goOnSpl = async () => {
             group(_id: String): Group
         }
 
+        type Subscription {
+            channelAdded: Task
+        }
+
         type Subject {
             _id: String
             title: String
@@ -56,6 +70,7 @@ export const goOnSpl = async () => {
             usersId: String
             subjects(day: String = "123456"): [Subject]
             users: [User]
+            tasks: [Task]
         }
 
         type User {
@@ -75,12 +90,13 @@ export const goOnSpl = async () => {
             content: String
             subjectId: String
             subjects: Subject
+            groupId: String
         }
 
         type Mutation {
             createGroup(title: String, content: String, userId: String) : Group
             createUser(first_name: String, last_name: String, login: String, password: String): User
-            createTask(title: String, content: String, subjectId: String): Task
+            createTask(title: String, content: String, groupId: String): Task
             createSubject(title: String, teacher: String, date: String, groupId: String, time: String): Subject
             updateSubject(_id: String, days: String): Subject
             updateUser(_id: String, groupId: String) : User
@@ -91,6 +107,7 @@ export const goOnSpl = async () => {
         schema {
             query: Query
             mutation: Mutation
+            subscription: Subscription
         }
     `];
 
@@ -152,6 +169,9 @@ export const goOnSpl = async () => {
                 }
             },
             Group: {
+                tasks: async ({ _id }) => {
+                    return (await Tasks.find({groupId: _id}).toArray()).map(prepare)
+                },
                 subjects: async ({_id}, {teacher, day}) => {
                     if (teacher != undefined) {
                         return (await Subjects.find({teacher: teacher, groupsId: ObjectId(_id)}).toArray()).map(prepare)
@@ -171,6 +191,11 @@ export const goOnSpl = async () => {
                     
                 }
             },
+            Subscription: {
+                channelAdded: {  // create a channelAdded subscription resolver function.
+                    subscribe: () => pubsub.asyncIterator(CHANNEL_ADDED_TOPIC)  // subscribe to changes in a topic
+                }
+            },
             Mutation: {
                 createUser: async (root, args, context, info) => {
                     const res = await Users.insert(args)
@@ -180,7 +205,16 @@ export const goOnSpl = async () => {
                     const res = await Users.findOneAndUpdate({ _id: ObjectId(args._id)}, {$push: {groupId: ObjectId(args.groupId)}})
                 },
                 createTask: async (root, args, context, info) => {
+                    // const newTask = { id: "asdasdasd", messages: [], name: args.name };
+                    // channels.push(newTask);
+                    // pubsub.publish(CHANNEL_ADDED_TOPIC, { channelAdded: newTask });
+                    console.log("HI")
                     const res = await Tasks.insert(args)
+                    const newTask = {_id: "asldld", title: args.title, content: args.content, subjectId: null, groupId: args.groupId}
+                    console.log(newTask)
+                    // channels.push(newTask);
+                    pubsub.publish(CHANNEL_ADDED_TOPIC, { channelAdded: newTask });
+
                     return prepare(await Tasks.findOne({ _id: ObjectId(res.insertedIds[0])}))
                 },
                 createSubject: async (root, args, context, info) => {
@@ -232,7 +266,8 @@ export const goOnSpl = async () => {
         const homePath = '/graphiql'
 
         app.use(homePath, graphiqlExpress({
-            endpointURL: '/graphql'
+            endpointURL: '/graphql',
+            subscriptionsEndpoint: `ws://localhost:${PORT}/subscriptions`
         }))
 
         app.listen(PORT, () => {
@@ -250,6 +285,14 @@ export const goOnSpl = async () => {
 
         serverio.listen(3010, function () {
             console.log('Example app listening on port 3010!');
+            new SubscriptionServer({
+                execute,
+                subscribe,
+                schema
+              }, {
+                server: serverio,
+                path: '/subscriptions',
+            });
         });
         websocket.on('connection', (socket) => {
             socket.emit('message', 'data_test')
